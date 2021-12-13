@@ -27,6 +27,8 @@ from petastorm.reader_impl.shuffling_buffer import RandomShufflingBuffer, NoopSh
 from petastorm.reader_impl.pytorch_shuffling_buffer import BatchedRandomShufflingBuffer, \
     BatchedNoopShufflingBuffer
 
+from insitro_core.imls import profiler
+
 _TORCH_BEFORE_1_1 = version.parse(torch.__version__) < version.parse('1.1.0')  # type: ignore
 
 if PY2:

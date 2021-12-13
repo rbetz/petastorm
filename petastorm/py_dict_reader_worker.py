@@ -25,6 +25,8 @@ from petastorm.cache import NullCache
 from petastorm.workers_pool import EmptyResultError
 from petastorm.workers_pool.worker_base import WorkerBase
 
+from insitro_core.imls import profiler
+
 
 def _merge_two_dicts(a, b):
     """Merges two dictionaries together. If the same key is present in both input dictionaries, the value from 'b'
@@ -75,6 +77,7 @@ class PyDictReaderWorkerResultsQueueReader(object):
             # and return a single item upon each consequent call to __next__
             with self._result_buffer_lock:
                 if not self._result_buffer:
+                    profiler.get_instance().mark_time("result_buffer")
                     # Reverse order, so we can pop from the end of the list in O(1) while maintaining
                     # order the items are returned from the worker
                     list_of_rows = list(reversed(workers_pool.get_results()))
@@ -89,6 +92,7 @@ class PyDictReaderWorkerResultsQueueReader(object):
                         self._result_buffer = list_of_rows
                     else:
                         self._result_buffer = [schema.make_namedtuple(**row) for row in list_of_rows]
+                    profiler.get_instance().duration_event("Get row from result buffer", "result_buffer")
 
                 return self._result_buffer.pop()
 
@@ -149,6 +153,7 @@ class PyDictReaderWorker(WorkerBase):
             if shuffle_row_drop_partition[1] != 1:
                 raise RuntimeError('Local cache is not supported together with shuffle_row_drop_partitions > 1')
 
+        profiler.get_instance().mark_time("data")
         if worker_predicate:
             all_cols = self._load_rows_with_predicate(parquet_file, piece, worker_predicate, shuffle_row_drop_partition)
         else:
@@ -161,6 +166,7 @@ class PyDictReaderWorker(WorkerBase):
                                           piece.path, piece_index)
             all_cols = self._local_cache.get(cache_key,
                                              lambda: self._load_rows(parquet_file, piece, shuffle_row_drop_partition))
+        profiler.get_instance().duration_event("Read parquet chunk", "data")
 
         if self._ngram:
             all_cols = self._ngram.form_ngram(data=all_cols, schema=self._schema)

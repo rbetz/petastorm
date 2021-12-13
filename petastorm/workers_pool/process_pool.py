@@ -19,6 +19,7 @@ import logging
 import pickle
 import sys
 import os
+import random
 from time import sleep, time
 from traceback import format_exc
 
@@ -31,6 +32,8 @@ from zmq import ZMQBaseError
 from petastorm.reader_impl.pickle_serializer import PickleSerializer
 from petastorm.workers_pool import EmptyResultError, VentilatedItemProcessedMessage
 from petastorm.workers_pool.exec_in_new_process import exec_in_new_process
+
+from insitro_core.imls import profiler
 
 # When _CONTROL_FINISHED is passed via control socket to a worker, the worker will terminate
 _CONTROL_FINISHED = "FINISHED"
@@ -175,6 +178,11 @@ class ProcessPool(object):
             to know about the ventilator to know if it has completed ventilating items.
         :return: ``None``
         """
+        # Random sleep to stagger workers
+        profiler.get_instance().mark_time("init_sleep")
+        sleep(random.random() * 3)
+        profiler.get_instance().duration_event("Random stagger", "init_sleep")
+
         # Initialize a zeromq context
         self._context = zmq.Context()
 
@@ -248,6 +256,7 @@ class ProcessPool(object):
             if not socks:
                 continue
             # Result message is a tuple containing data payload and possible exception (or None).
+            profiler.get_instance().mark_time("deserialize")
             fast_serialized, pickle_serialized = self._results_receiver.recv_multipart(copy=self._zmq_copy_buffers)
             pickle_serialized = pickle.loads(pickle_serialized)
 
@@ -257,6 +266,7 @@ class ProcessPool(object):
                     self._ventilated_items_processed += 1
                     if self._ventilator:
                         self._ventilator.processed_item()
+                    profiler.get_instance().duration_event("Unpickle message", "deserialize")
                 elif isinstance(pickle_serialized, Exception):
                     self.stop()
                     self.join()
@@ -267,6 +277,7 @@ class ProcessPool(object):
                     deserialized_result = self._serializer.deserialize(fast_serialized)
                 else:
                     deserialized_result = self._serializer.deserialize(fast_serialized.buffer)
+                profiler.get_instance().duration_event("Unpickle data", "deserialize")
                 return deserialized_result
 
     def stop(self):
@@ -314,7 +325,9 @@ class ProcessPool(object):
 
 def _serialize_result_and_send(socket, serializer, data):
     # Result message is a tuple containing data payload and possible exception (or None).
+    profiler.get_instance().mark_time("serialize")
     socket.send_multipart([serializer.serialize(data), pickle.dumps(None)])
+    profiler.get_instance().duration_event("Pickle and send data", "serialize")
 
 
 def _monitor_thread_function(main_process_pid):

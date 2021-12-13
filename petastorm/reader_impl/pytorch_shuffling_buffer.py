@@ -15,6 +15,8 @@
 import abc
 from collections import deque
 
+from insitro_core.imls import profiler
+
 import six
 import torch
 
@@ -245,8 +247,10 @@ class BatchedRandomShufflingBuffer(BatchedShufflingBufferBase):
                 self._items[k][:self._size] = v[:self._size]
 
         # Copy new items over
+        profiler.get_instance().mark_time("shuffle_add")
         for k, v in enumerate(items):
             self._items[k][self._size:expected_size] = v
+        profiler.get_instance().mark_time("Copy rows to shuffle buffer", "shuffle_add")
         self._size = expected_size
 
     def retrieve(self):
