@@ -13,11 +13,12 @@
 # limitations under the License.
 import pickle
 
+# ROBIN: use protocol 5
 
 class PickleSerializer(object):
 
     def serialize(self, rows):
-        return pickle.dumps(rows)
+        return pickle.dumps(rows, protocol=pickle.HIGHEST_PROTOCOL)
 
     def deserialize(self, serialized_rows):
         return pickle.loads(serialized_rows)
