@@ -178,11 +178,6 @@ class ProcessPool(object):
             to know about the ventilator to know if it has completed ventilating items.
         :return: ``None``
         """
-        # Random sleep to stagger workers
-        profiler.get_instance().mark_time("init_sleep")
-        sleep(random.random() * 3)
-        profiler.get_instance().duration_event("Random stagger", "init_sleep")
-
         # Initialize a zeromq context
         self._context = zmq.Context()
 
@@ -383,6 +378,11 @@ def _worker_bootstrap(worker_class, worker_id, control_socket, worker_receiver_s
 
     # Use this 'none_marker' as the first argument to send_multipart.
     none_marker = bytes()
+
+    # Sleep a random amount of time to stagger worker start times.
+    profiler.get_instance().mark_time("worker_stagger")
+    sleep(random.random() * 5)
+    profiler.get_instance().duration_event("Worker init stagger", "worker_stagger")
 
     logger.debug('Instantiating a worker')
     # Instantiate a worker
